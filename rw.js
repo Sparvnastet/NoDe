@@ -3,56 +3,61 @@ var filesystem = require('fs'),
     readline = require('readline');
 
 var rd = readline.createInterface({
-    input: filesystem.createReadStream('test/org.stl'),
+    input: filesystem.createReadStream('test/cyli.gcode'),
     output: process.stdout,
     terminal: false
 });
 
+just_copy = 0;
 
 rd.on('line', function(line) {
+    // remove line brake
     var line = line.replace(/(\n)/gm,"");
+    // splite line
     var splited = line.split(' ');
     var first = splited[0];
-    // is it a G line
-    if (first.substring(0,1) == 'G') {
+    // is it a G1 line
+    if (first.substring(0,2) == 'G1') {
+        if (just_copy != 1) {
+            var type = splited[1].substring(0,1);
 
-        var type = splited[1].substring(0,1);
+            if (type == 'Z') {
+               printline(line);
+            }
+            else if (type == 'X') {
+                xyline(splited);
+            }
+            else {
+            }
 
-        if (type == 'Z') {
-           zline(line);
-        }
-        else if (type == 'X') {
-            xyline(splited);
-        }
-        else {
-
+        } else {
+            printline(line);
         }
     // is it a M line
-    } else  if (first.substring(0,1) == 'M') {
-        mline(line);
     }  else {
-
+        printline(line);
     }
 });
 
-function zline(line) {
+function printline(line) {
     write_line(line);
 }
+
 function xyline(splited) {
-    var x_num = parseInt(splited[1].substring(1));
+    var x_num = parseFloat(splited[1].substring(1));
     var r = get_random();
     x_num = r + x_num;
-    var y_num = parseInt(splited[2].substring(1));
+    var y_num = parseFloat(splited[2].substring(1));
     r = get_random();
     y_num = r + y_num;
     line = splited[0] + ' X' + x_num + ' Y' + y_num;
     if (splited[3])
-        line = line + ' ' + splited[3].substring(0,3);
+        line = line + ' ' + splited[3];
+    if (splited[4])
+        line = line + ' ' + splited[4];
     write_line(line);
 }
-function mline(line) {
-    write_line(line);
-}
+
 
 function reset_values() {
     g_value = '';
@@ -62,11 +67,11 @@ function reset_values() {
 }
 
 function get_random() {
-    r =  Math.floor(Math.random() * 7) - 2;
+    r =  Math.floor(Math.random()* 2) - 1;
     return r;
 }
 function write_line(line) {
-    filesystem.appendFile('test/new.stl', line+'\n', function (err) {
+    filesystem.appendFile('test/new_c.gcode', line+'\n', function (err) {
         console.log(line)
     });
 }
