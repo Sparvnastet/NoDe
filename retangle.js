@@ -2,15 +2,20 @@
 // import the file system modual
 var filesystem = require('fs');
 var lazy = require("lazy");
-var nasty = []
-new lazy(filesystem.createReadStream('data/nasdaq_cut.csv'))
+var nasty = ''
+new lazy(filesystem.createReadStream('data/nasdaq.csv'))
     .lines
     .forEach(function(line){
+        if (nasty.length < 16000) {
         splited = line.toString().split(',');
-        nasty = nasty + splited[1];
+        num = splited[1];
+        nasty = nasty + ','+ num.substring(1,5);
+        }
     }
 );
-var csv_key = 1;
+
+var key = 0;
+var data =  ''; 
 
 
 // process config and set initial data in the json file
@@ -23,20 +28,28 @@ var pattern = config.pattern;           // pattern can be; nopattern, spike, wav
 var input = config.input;               // input can be; list, json, tcp, http, pot (serial potentiometer), random
 var z = config.z_origin;
 var lead_value = config.lead_value;
+var file_name = config.file_name;
+var dubbling = config.dubbling;
+var leading = true; 
 
 var y_size = config.y_size,
+	y_1 = y_size*-1; 
+	y_2 = y_size-1; 
+	 
     y_goal = y_size-1,
-    y = (y_goal * -1);
+    y = y_1;
 
 var x_size = config.x_size,
-    x = x_size;
+	x_1 = x_size; 
+	x_2 = (x_size*-1); 
+    x = x_2;
     x_goal = x_size;
     line = '',
     i = 1,
     r = 1,
     type = 'xplus';
 
-var write_space_unite = ( y_size/((y_size*2)/frequency))-(lead_value*2);
+var write_space_unite = ( y_size/frequency)-(lead_value*2);
 
 
 if (input == 'list') {
@@ -46,7 +59,7 @@ if (input == 'list') {
 }
 
 // init serial port read
-if (input = 'serial') {
+if (input == 'serial') {
 var serialport = require("serialport");
 var SerialPort = serialport.SerialPort;
 
@@ -70,72 +83,83 @@ serial_port.on("data", function (data) {
 serial_port.on("error", function (msg) {
     util.puts("error: "+msg);
 })
-} else {
-    new_write(data);
 }
 
+var collation = '';
 
 
+p = 1;
+c = 0; // dubbling count
+
+			
 // write the base rectangle
-function new_write(data) {
-
-    if (type == 'xplus') {
-
-        if (x <= y_goal) {
-            line = 'G1 X'+x+' Y'+y+' Z'+z+' F'+fill;
-            x = x + 1;
-            write_line(line, type);
-        } else {
-            type = 'yplus';
-            x = x_goal;
-            write_line('');
-        }
+function new_write() {
+	list_key = 0;
+		
+    old_key = key;
+    for ( ;y >= y_1; y--) { 
+        line = 'G1 X'+x+' Y'+y+' Z'+z+'\n';
+        collation = collation + line;
     }
 
-    if (type == 'yplus') {
-        if (y <= y_goal) {
-            line = 'G1 X'+x+' Y'+y+' Z'+z+' F'+fill;
-            y = y + frequency;
-            write_line(line, data);
-        }  else {
-            y = y_size;
-            goal = x_goal
-            write_line('');
-            type = 'xminus'
-        }
+    for ( ;x <= x_1; x++) { 
+        line = 'G1 X'+x+' Y'+y+' Z'+z+'\n';
+        collation = collation + line;
     }
 
-    if (type == 'xminus') {
-        if (x >= goal) {
-            line = 'G1 X'+x+' Y'+y+' Z'+z+' F'+fill;
-            x = x - 1;
-            write_line(line, type);
-        }  else {
-            x = 0;
-            write_line('');
-            type = 'yminus'
-        }
+    for (; y <= y_2; y++) { 
+        line = 'G1 X'+x+' Y'+y+' Z'+z+'\n';
+        collation = collation + line;
     }
 
-    if (type == 'yminus') {
-        if (y >= goal) {
-            line = 'G1 X'+x+' Y'+y+' Z'+z+' F'+fill;
-            y = y - 1;
-            write_line(line, type);
-        }  else {
-            y = -16;
-            z = z + z_adder;
-            goal = y_goal
-            write_line('');
-            type = 'xplus'
-            list_key = 0;
-            watchingfile();
-        }
+
+    for ( ;x >= x_2; x = x - frequency) {
+	// if plain pattern else other patterns that need additional points 
+	if (pattern == 'plain') {
+        mod = get_change();
+        line = 'G1 X'+x+' Y'+mod+' Z'+z+'\n';
+        
+	} else {
+		if (x >= x_2+frequency) {
+        mod = add_changes(x, y ,z);
+		newlines = ''; 
+        line = mod;
+		}
+	}
+        collation = collation + line;
+
     }
+	
+	// copy the lines dubbling times
+    if (c < dubbling){
+        key = old_key;
+        c++;
+    } else {
+        c = 0
+    }
+    x++;
+    line = 'G1 X'+x+' Y'+y+' Z'+z+'\n';
+    collation = collation + line;
+    w_write(collation);
+
 }
 
+n = 1;
 
-function write_pattern(line, data) {
+// write the collacion of lines to file
+function w_write(collation) {
+filesystem.appendFile('test/'+file_name, collation+'\n', function (err) {
+        if (p == 20){
+        } else {
+            z = z + z_adder;
+            new_write()
+            p++;
+            n=1;
+        }
+	});
+}
+
+function split_string(line, data) {
     if (line)
         var splited = clean_split(line.toString());
 
@@ -145,48 +169,40 @@ function write_pattern(line, data) {
 
 // use this function to make sure that data are written before we continue
 function watchingfile() {
-filesystem.watchFile('test/scraper_13.gcode', function (curr, prev) {
-    console.log("new set");
+filesystem.watchFile('test/'+file_name, function (curr, prev) {
     new_write();
-    filesystem.unwatchFile('test/scraper_13.gcode');
+
+    filesystem.unwatchFile('test/'+file_name);
 });
 }
 
-// write a new set of gode lines
+// write a new set of lines
 function write_line(line, data) {
     if (pattern == 'nopattern') {
         var splited = clean_split(line);
         var line = get_one_line(splited, data);
-
-        filesystem.appendFile('test/scraper_13.gcode', line+'\n', function (err) {
+        filesystem.appendFile('test/'+file_name, line+'\n', function (err) {
 
         });
 
     } else { // no pattern just plot
-        filesystem.appendFile('test/scraper_13.gcode', line+'\n', function (err) {
+        filesystem.appendFile('test/'+file_name, line+'\n', function (err) {
             if (r == 1) {
                 write_pattern(line, data);
                 r = 0;
             } else {
                 r = 1;
-
             }
         });
-
-
     }
 }
 
 
 // help function per line
 function clean_split(line) {
-    if (line == '0') {
-        return null;
-    } else {
-        // splite line
         var splited = line.split(' ');
+		console.log(splited); 
         return splited;
-    }
 }
 
 // when we need som random input
@@ -197,47 +213,83 @@ function get_random() {
 
 
 // Filters -----------------------
-
-function add_changes(splited, data) {
-    // 1:X 2:Y 3:Z 4:F
-    if (data) {
-        if (splited[1]) {
-            if (type == 'yplus') {
-
-                var g_value = parseInt(splited[0].substring(1));
-                var x_value = parseInt(splited[1].substring(1));
-                var y_value = parseInt(splited[2].substring(1));
-                var z_value = parseInt(splited[3].substring(1));
-                var f_value = parseInt(splited[4].substring(1));
-
-                var base = x_value;
-
-                var y_value = lead(y_value, lead_value);
-                var l1 = set_line(g_value, base, y_value, z, f_value, 'leading start');
-
-                var change = get_change(data);
-                x_value = Math.round( (x_value + change ) * 10) / 10;
-                y_value = Math.round( (y_value + write_space_unite/2)  * 10) / 10;
-
-                var l2 = set_line(g_value, x_value, y_value, z, f_value, 'up');
-
-                x_value = Math.round( (x_value - change ) * 10) / 10;
-                y_value = Math.round( (y_value + write_space_unite/2)  * 10) / 10;
-                var l3 = set_line(g_value, base, y_value, z, f_value, 'down');
-
-                var y_value = lead(y_value, lead_value)
-                var l4 = set_line(g_value, x_value, y_value, z, f_value, 'leading end');
+// take a splited string of gcode and returns a modulation on that
+var newlines = '';
 
 
-                var newlines =  make_lines(l1, l2, l3, l4);
+function add_changes(x, y, z) {
+	
+    var x_value = x;
+    var y_value = y;
+	var z_value = z;
+    var f_value = '200' 
 
-                console.log(newlines);
-                write_line(newlines);
+	var l0 = set_line('1', x_value, y_value, z_value, f_value, 'leading start');
+	newlines = newlines + l0; 
+	// if leading part 1
+	if (leading == true) {
+		var x_value = lead(x_value, lead_value);
+		var l1 = set_line('1', x_value, y_value, z_value, f_value, 'leading start');
+		newlines = newlines + l1; 
+	}
 
-            }
-        }
-    }
+    // if leading part 2
+    var change = get_change(data);
+    // add the chang to the current x_value
+    y_value = Math.round( (y_value + change ) * 10) / 10;
+	
+
+	// set spaceing         
+    if (pattern == 'spike') {
+		space = Math.round( (write_space_unite/2)  * 10) / 10;
+	} else if (pattern == 'dubblespike') {
+		space = Math.round( (write_space_unite/3)  * 10) / 10;
+	} else {
+		space = Math.round( (write_space_unite/2)  * 10) / 10;
+	}
+
+	x_value = Math.round( (x_value - space)  * 10) / 10;
+    var l2 = set_line('1', x_value, y_value, z_value, f_value, 'up');	
+	newlines = newlines + l2; 
+	
+    // if leading part 3
+	if (pattern == 'dubblespike') {
+	   	x_value = Math.round( (x_value - space)  * 10) / 10;
+        y_value = Math.round( (y_value - change*2 ) * 10) / 10;
+    	var l3 = set_line('1', x_value, y_value, z_value, f_value, 'dubbel down');	
+		newlines = newlines + l3; 
+	} else if (pattern == 'rect') {
+	   	x_value = Math.round( (x_value - space)  * 10) / 10;
+    	var l3 = set_line('1', x_value, y_value, z_value, f_value, 'rect up');	
+		newlines = newlines + l3; 
+    } else {
+
+	}
+
+	if (pattern == 'spike' || pattern == 'rect') {
+		x_value = Math.round( (x_value - space)  * 10) / 10;
+        y_value = Math.round( (y_value - change ) * 10) / 10;               
+	} else if (pattern == 'dubblespike') {
+		x_value = Math.round( (x_value - space)  * 10) / 10;
+        y_value = Math.round( (y_value + change ) * 10) / 10;
+    } else {
+	
+	}
+	
+	var l4 = set_line('1', x_value, y_value, z_value, f_value, 'last');	
+
+    newlines = newlines + l4; 
+
+    if (leading == true) {
+		var x_value = lead(x_value, lead_value)
+		var l5 = set_line('1', x_value, y_value, z_value, f_value, 'leading end');
+		newlines = newlines + l5;
+	}	
+
+    return newlines; 
+
 }
+
 
 // when not using any patterns
 function get_one_line(data){
@@ -247,8 +299,9 @@ function get_one_line(data){
     var l2 = set_line('1', x_value, y_value, z, '199', 'up');
     return l2;
 }
-function lead(current_y, lead_value) {
-    return Math.round( (current_y + lead_value) * 10) / 10;
+
+function lead(current, lead_value) {
+    return Math.round( (current - lead_value) * 10) / 10;
 }
 
 
@@ -263,6 +316,7 @@ function set_line(g, x, y, z, fill, comment) {
     if (comment) {
         line = line + ' ;' + comment;
     }
+	var line = line + '\n';;
 
     return line;
 }
@@ -272,24 +326,39 @@ function get_change(data) {
     if (input == 'pot') {
         var change = parseInt(data)/100-5;
         return change;
-     // get data from list
+   
+    // get data from list
     } else if (input == 'list') {
-        list_key = list_key + 1;
-        return list[list_key]/10;
-
+		list_key = list_key + 1;
+        return list[list_key]/5;
+		
+    // get data from csv file
     } else if (input == 'csv') {
-    csv_key = csv_key + 1;
-    console.log("sss");
-    return nasty[csv_key]/500;
-
+		mod = get_data_by_key();
+		mod = mod/2000;
+		return mod;
 
     } else {
         return get_random();
     }
 
 }
+
 // help funnction to make a set of lines
 function make_lines(l1, l2, l3, l4) {
     var newlines = l1 + '\n' + l2 + '\n' + l3 + '\n' + l4;
     return newlines;
 }
+
+// get csv data
+function get_data_by_key() {
+    key++;
+    return nasty[key];
+}
+
+// use this so the data from the csv file is ready
+setTimeout(function(){
+    nasty = nasty.toString().split(',');
+    new_write();
+}, 2000);
+

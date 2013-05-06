@@ -1,0 +1,15 @@
+{
+    "usb_port": "USB0",
+    "z_height": 0.4,
+    "filament_speed": 200,
+    "spike_length": 4,
+    "frequency": 2,
+    "pattern": "plain",
+    "input": "list",
+    "y_size": 4,
+    "x_size": 22,
+    "z_origin": 0,
+    "lead_value": 0.4,
+    "file_name": "re_2.gcode", 
+    "dubbling": 1
+}
