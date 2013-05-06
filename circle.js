@@ -207,7 +207,7 @@ function get_change(data, key_data, key) {
 		list_key = list_key + 1;
         if (list_key == segments) 
 			list_key = 0;
-		return list[list_key]/5;
+		return list[list_key]/2;
 		
 		
     // get data from csv file
