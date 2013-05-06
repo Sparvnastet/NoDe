@@ -9,6 +9,23 @@ At Internetdagarna the project would draw the attention of a crowd by its animat
 
 Software : Node.js and Arduino. 
 
-To generate a model 
-use the config file to setup you parameters 
+There are two files for generating gcode. circle.js and retangle.js
+Use the config json file to setup your parameters.
+
+Set the position, radius, segments, scale, height, input and pattern of the model
+
+Input:
+* potentiometer with a arduino
+* csv file
+* lists 
+* random
+
+Patterns: 
+* spikes
+* plain 
+
+Then test the to output some gcode
 $ node circle.js 
+$ node retangle.js
+
+Use your preferd gcode viewer to look at the model. 
