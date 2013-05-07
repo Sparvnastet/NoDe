@@ -26,6 +26,7 @@ Patterns:
 
 Then test the to output some gcode
 $ node circle.js 
+
 $ node retangle.js
 
-Use your preferd gcode viewer to look at the model. 
+Use your preferd gcode viewer to look at the model.
