@@ -13,6 +13,8 @@ var config = JSON.parse(filesystem.readFileSync("config_circle.json"));
 // set values from config file
 var x = config.x; // 
 var y = config.y; // 
+var z = config.z;
+var model_height = z;  
 var centerX = config.center_x; // 100 - place the model in the middle of the print plan
 var centerY = config.center_y; // 100 - place the model in the middle of the print plan
 var radius = config.radius; // 
@@ -28,16 +30,17 @@ var spikes = config.spike_length;
 filename = config.file_name+'.gcode';  // make it global
 var circle = '';
 var line = '';
-var add_z = filament_diameter+0.1;
+var add_z = filament_diameter-0.1;
 var filament_diffrence = config.filament_diffrence; 
 var extruder_diffrence = config.extruder_diffrence ;
 var extruder_mod = config.extruder_mod; 
 var radius_factor = config.radius_factor; 
 var input = config.input; 
 var filament = config.filament; 
-var extra_filament = 7200; 
+var extra_filament = config.extra_filament; 
 var total_distance = 0; 
-
+var temp = config.temperature
+ 
 if (input == 'serial') 
 	var usb_port = config.usb_port; 
 	console.log('Input port: '+usb_port); 
@@ -45,8 +48,7 @@ if (input == 'serial')
 if (input == 'csv') {
 	var data_file = config.data_file;  
 	// 2518 data points
-	height = Math.round(2518 / segments); 
-	segments = segments * 2;  
+	height = Math.round((2518 / segments) / 10); 
 	}
  
 console.log('Input: '+input); 
@@ -61,24 +63,28 @@ scale_factor = false;
 the_xy_factor = 1;  
 
 var dubbling =  config.dubbling; 
+var d = dubbling; 
 var data_from_file = ''
 var key = 0;
-var csv_key = 1;
-var i = 0,
-    j = 0,  
-	z = 0;
-var dubble_lines = ''; 
 
 
 // init data and start writing to file
 function init_data() {
-	var starting_lines =  '; sparvnastet.org \nG21 ; set units to millimeters \nM107 ; fan off \nM104 S200 ; set temperature \n' +
-					'G28 ; home all axes \nG1 Z5 F5000 ; lift nozzle \n\nM109 S200 ; wait for temperature to be reached \n' +
-					'G90 ; use absolute coordinates \nG92 E0 ; extrusion zero \nM82 ; use absolute distances for extrusion \n' +
-					'G1 F1800.000 E-1.00000 \nG92 E0 ; extrusion zero \nG1 Z0.350 F7800.000\n\n'+
-					'G1 X'+centerX+' Y'+centerX+' ; set staring position' +
-					'\nG1 F1800.000 E1.00000 ; filament push and extrude start? \nG1 F540.000 ; filament speed \nM101 \n\n' +
-					';center x, y: '+ centerX+' , '+ centerY +
+	var starting_lines =  '; https://github.com/Sparvnastet/NoDe \n' +
+					'\nG21 ; set units to millimeters ' +
+					'\nM107 ; fan off ' +
+					'\nM104 S'+temp+ ' ; set temperature ' +
+					'\nG28 ; home all axes ' +
+					'\nG1 Z5 F5000 ; lift nozzle \n' +
+					'\nM109 S'+temp+ '; wait for temperature to be reached \n' +
+					'\nG90 ; use absolute coordinates ' +
+					'\nM82 ; use absolute distances for extrusion \n' +
+					'\nG92 X10 E0 ; extrusion zero ' +
+					'\nG1 Z'+z+' F7800.000\n'+
+					'\nG1 X'+centerX+' Y'+centerX+' ; set staring position' +
+					'\nG1 F540.000 ; filament speed ' +
+					'\nM101 \n' +
+					'\n;center x, y: '+ centerX+' , '+ centerY +
 					'\n;radius: '+ radius_f + 
 					'\n;segments: ' + segments + 
 					'\n;height: '+ height + 
@@ -98,7 +104,8 @@ console.log('center x, y: '+ centerX+' , '+ centerY +
 			'\nheight per circle: ' + add_z + 
 			'\nuseing filament diffrence: ' + filament_diffrence + 
 			'\nuseing extruder diffrence: ' + extruder_diffrence); 
-
+			
+	// set the time out so the file gets process before we start retriving data
 	setTimeout(function(){
 		write_copy(starting_lines);
 		first = 0; 
@@ -109,73 +116,81 @@ console.log('center x, y: '+ centerX+' , '+ centerY +
 }
 
 
-// make the each circle with parameters and dubble it if specified
+// make the each circle with parameters
 function make_circle(centerX, centerY, radius_f, segments, height, data){
  
-    if (j < height) {	
-		s_add = 1;
-		
-		// for every segment in each circle - makes a turn of new data
+    if (z < height) {	
+		// for every segment in this circle - makes the turn of new data
         for(var i=0; i<segments; i++){		
 		    
-			// save previous x and y values to calculate the distance
+			// save previous x and y values to calculate the distance for the extrution value
 			old_x = x;
 			old_y = y;
 			
+			// get the a new radius
 			radius = get_radius(data, i)
-			
+		
 			// getting x and y from specified values 
 			x = Math.round((centerX + radius * Math.sin(i * 2 * Math.PI / segments)) * 10) / 10;
 			y = Math.round((centerY + radius * Math.cos(i * 2 * Math.PI / segments)) * 10) / 10;
 
-			// scaling
+			// scaling from value in config json 
 			x = Math.round(((x * scale_x * 10) / 10));
 			y = Math.round(((y * scale_y * 10) / 10));
 		
+			// tranform from value in config json 
 			if (xy_factor) {	
 				xy_tranform();
 			}
 
 			line = 'G1 X'+ x+' Y'+y;
-
+			
+			// add filement value if true
 			if (filament_diffrence) {
-				// for the last segment
-				if (i == segments-1){
-				line = line + ' F'+extra_filament;
-				} else {
-				line = line + ' F'+filament;
+				// if it is the last segment add extra filament
+				if (i == segments-1) {
+					line = line + ' F'+extra_filament;
+				// if it is the first segment normal filament
+				} if (i == 0) {
+					line = line + ' F'+filament;
+				}	
+			}	
+			
+			// add extrud value if true and if it is not the last segment
+			if (extruder_diffrence) {
+				if (i != segments-1) {
+				new_distance = extruction_value();
+				total_distance = total_distance + new_distance; 
+				line = line + ' E'+Math.round(total_distance* 1000) / 1000; 
 				}
 			}
-
-			if (extruder_diffrence) {
-				new_distance = extruction_value();
-		
-				total_distance = total_distance + new_distance; 
-				console.log(total_distance, new_distance) 
-				line = line + ' E'+Math.round(total_distance* 1000) / 1000; 
+			
+			// if it is the last segment add the z_move else just add a line break
+			if (i == segments-1) {
+				the_scaled_z = Math.round(z * scale_z * 10) / 10; 
+				var zline = '\nG1 Z'+the_scaled_z+'\n';
+				z = z + add_z;
+				console.log(z)
+				line = line + zline;	
+			} else {
+				line = line + '\n'; 
 			}
 			
-			line = line + '\n';
-		
-			circle = circle + line;		
-			
-		} 
-		save_circle = circle;
-	
-		for (var n=0; n<dubbling; n++) {
-			z = j;
-			z = Math.round(z * scale_z * 10) / 10; 
-			var zline = 'G1 Z'+z+'\n';
-			j = j + add_z;
-			circle = zline + save_circle; 
-			write_copy(circle);
+		// add the line to the circle		
+		circle = circle + line;	
+		line = ''; 
 		}
-		 write_new_data(circle);
-		circle = '';
-		
-    }
+	// write the new circle to file	
+	write_new_circle_data(circle);
+	// reset the circle value
+	circle = '';		
 
+	} 
+
+	
 }
+
+
 
 // write a copy of a circle when we only change the z-axes
 function write_copy(circle) {
@@ -184,15 +199,16 @@ function write_copy(circle) {
 }
 
 // write a copy of a circle with new data
-function write_new_data(circle) {
+function write_new_circle_data(circle) {
     filesystem.appendFile('test/'+filename, circle+'\n', function (err) {
-		circle = '';
 				
-		// narrow model
+		
+		// if we are using the narrow paramater in the config json file
 		if (radius_factor) {
-		radius_f = radius_f - radius_factor; 
+			radius_f = radius_f - radius_factor; 
 		}
 		
+		// if it not serial input continue to make a new circle
 		if (input != 'serial') {
 			make_circle(centerX, centerY, radius_f, segments, height, key_data);
 		}
@@ -214,7 +230,6 @@ function new_data(data) {
 // get radius data with or without spikes
 function get_radius(data, i) {
 	if (pattern == 'spikes') {
-		console.log(i)
 		if (i%2==0) {
 			radius = new_data(data);
 		} else {
@@ -244,32 +259,44 @@ function extruction_value(){
 
 // get change depedning on input 
 function get_change(data, key_data, key) {
-    // get data from potentiometer
-    if (input == 'serial') {
-        var change = parseInt(data)/100-5;	
-        return change;
-    // get data from list
-    } else if (input == 'list') {
-		list_key = list_key + 1;
-        if (list_key == segments) 
-			list_key = 0;
-		return list[list_key]/2;
-    // get data from csv file
-    } else if (input == 'csv') {
-		mod = get_data_by_key();
-		mod = mod/500;
-		return mod;
-    } else if (input == 'random') {
-       	return modules.near(old_radius, radius_f);
-    } else {
-		return data;
-	}
-
+	
+		// get data from potentiometer
+		if (input == 'serial') {
+			var change = parseInt(data)/100-5;	
+			return change;
+		// get data from list
+		} else if (input == 'list') {
+			list_key = list_key + 1;
+			if (list_key == segments) 
+				list_key = 0;
+			return list[list_key]/2;
+		// get data from csv file
+		} else if (input == 'csv') {
+		
+			mod = get_data_by_key();
+			mod = mod/500;
+			/*if (d == dubbling) {
+				key = key - dubbling; 	
+				console.log('key: '+key)			
+				d = 0; 
+			} else {
+				d++; 
+			}*/
+		
+			return mod;
+			
+		} else if (input == 'random') {
+			return modules.near(old_radius, radius_f);
+		} else {
+			return data;
+		}
+		
+	
 }
 
 
 
-// input data ------------------
+// input data ------------------>
 
 if (input == 'list') {
 	list_key = -1;
