@@ -35,7 +35,8 @@ var extruder_mod = config.extruder_mod;
 var radius_factor = config.radius_factor; 
 var input = config.input; 
 var filament = config.filament; 
-
+var extra_filament = 7200; 
+var total_distance = 0; 
 
 if (input == 'serial') 
 	var usb_port = config.usb_port; 
@@ -138,12 +139,20 @@ function make_circle(centerX, centerY, radius_f, segments, height, data){
 			line = 'G1 X'+ x+' Y'+y;
 
 			if (filament_diffrence) {
+				// for the last segment
+				if (i == segments-1){
+				line = line + ' F'+extra_filament;
+				} else {
 				line = line + ' F'+filament;
+				}
 			}
 
 			if (extruder_diffrence) {
-				distance = extruction_value();
-				line = line + ' E'+distance; 
+				new_distance = extruction_value();
+		
+				total_distance = total_distance + new_distance; 
+				console.log(total_distance, new_distance) 
+				line = line + ' E'+Math.round(total_distance* 1000) / 1000; 
 			}
 			
 			line = line + '\n';
@@ -198,8 +207,7 @@ function new_data(data) {
 	var new_value = get_change(data);
 	old_radius = radius;				
 	new_value = parseFloat(new_value, 10);
-	radius = radius_f + new_value + spikes;
-	console.log(radius); 	
+	radius = radius_f + new_value + spikes;	
 	return Math.round(radius * 10) / 10;
 }
 

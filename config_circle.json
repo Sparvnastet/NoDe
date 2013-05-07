@@ -24,6 +24,6 @@
 	"slow_write": 0, 
 	"filament_diffrence": 1, 
 	"extruder_diffrence": 1, 
-	"filament": 200	
+	"filament": 2000	
 }
 
