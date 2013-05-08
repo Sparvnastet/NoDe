@@ -48,7 +48,7 @@ if (input == 'serial')
 if (input == 'csv') {
 	var data_file = config.data_file;  
 	// 2518 data points
-	height = Math.round((2518 / segments) / 10); 
+	height = Math.round((2518 / (segments*2))); 
 	}
  
 console.log('Input: '+input); 
@@ -94,7 +94,8 @@ function init_data() {
 					'\n;pattern: ' + pattern +
 					'\n;z add: ' + add_z +  
 					'\n;useing filament diffrence: ' + filament_diffrence + 
-					'\n;useing extruder diffrence: ' + extruder_diffrence + '\n\n'; 
+					'\n;useing extruder diffrence: ' + extruder_diffrence +
+					'\n;start'; 
 			
 			
 console.log('center x, y: '+ centerX+' , '+ centerY + 
@@ -118,7 +119,7 @@ console.log('center x, y: '+ centerX+' , '+ centerY +
 
 // make the each circle with parameters
 function make_circle(centerX, centerY, radius_f, segments, height, data){
- 
+
     if (z < height) {	
 		// for every segment in this circle - makes the turn of new data
         for(var i=0; i<segments; i++){		
@@ -129,7 +130,8 @@ function make_circle(centerX, centerY, radius_f, segments, height, data){
 			
 			// get the a new radius
 			radius = get_radius(data, i)
-		
+			console.log(radius); 
+			
 			// getting x and y from specified values 
 			x = Math.round((centerX + radius * Math.sin(i * 2 * Math.PI / segments)) * 10) / 10;
 			y = Math.round((centerY + radius * Math.cos(i * 2 * Math.PI / segments)) * 10) / 10;
@@ -170,7 +172,6 @@ function make_circle(centerX, centerY, radius_f, segments, height, data){
 				the_scaled_z = Math.round(z * scale_z * 10) / 10; 
 				var zline = '\nG1 Z'+the_scaled_z+'\n';
 				z = z + add_z;
-				console.log(z)
 				line = line + zline;	
 			} else {
 				line = line + '\n'; 
@@ -262,8 +263,15 @@ function get_change(data, key_data, key) {
 	
 		// get data from potentiometer
 		if (input == 'serial') {
-			var change = parseInt(data)/100-5;	
-			return change;
+
+				var change = parseInt(data)/100;	
+				if (change) {
+					return change;
+					}
+				else {
+					return 20;
+				} 
+			
 		// get data from list
 		} else if (input == 'list') {
 			list_key = list_key + 1;
@@ -286,7 +294,7 @@ function get_change(data, key_data, key) {
 			return mod;
 			
 		} else if (input == 'random') {
-			return modules.near(old_radius, radius_f);
+			return modules.get_random_with_limit(20);
 		} else {
 			return data;
 		}
@@ -316,17 +324,19 @@ var serial_port = new SerialPort("/dev/tty"+usb_port, {
 	baudrate: 9600
 });
 
+var read_pot = 1; 
 serial_port.on("data", function (data) {
 	// slow down the output rate
 	setTimeout(function(){
-	if (i == 40) {
-		getCirclePoints(centerX, centerY, radius_f, segments, height, data);
-		i = 1; 
+	if (read_pot == 4) {
+		console.log(data); 
+		make_circle(centerX, centerY, radius_f, segments, height, data);
+		read_pot = 1; 
 	} else {
-		i++;
+		read_pot++;
 	}
 	
-	}, 4000);
+	}, 6000);
 
 	}); 
 

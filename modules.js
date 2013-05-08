@@ -38,6 +38,7 @@ function line_distance( p1x, p2x, p1y, p2y ) {
 	return Math.sqrt( xs + ys );
 }
 
+module.exports.get_random_with_limit = get_random_with_limit;
 module.exports.near = make_near_number;
 module.exports.line_distance = line_distance;
 
