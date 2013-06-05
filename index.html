@@ -1,0 +1,560 @@
+	<html>
+		<head>
+		<title>Modify print line</title>
+		<script src="http://code.jquery.com/jquery-1.9.1.min.js"></script>
+		<script src="/socket.io/socket.io.js"></script>
+		<script>
+		var j = 1; 
+		var socket = io.connect('http://localhost');
+		var x_prev = 25;
+		var y_prev = 25; 
+
+	    socket.on('position', function (data) {
+			console.log(data);
+			mouse_position();
+		})
+
+		socket.on('process', function (data) {
+				$('.process_indicator').removeClass("processing").html('File written: ' + filename + '<br> - Use you favorite gcode wiever to look at the file'); 
+		 
+		})
+
+		socket.on('mouse_client', function (data) {
+			splitde = data.x_y.split(' '); 
+			if (splitde[0] == 'G1' && splitde[1].substring(0,1) != 'Z') {
+			
+				x_ = parseFloat(splitde[1].substring(1)); 
+				y_ = parseFloat(splitde[2].substring(1));
+				
+				y_original = y_*6+242; 
+				x_original = x_*6+300; 
+		
+				color = "rgb("+j+","+j+",100)"; 
+				context.strokeStyle = color; 
+   			 	context.moveTo(x_prev, y_prev);
+				context.lineTo(x_original, y_original);
+				context.stroke();
+				console.log(x_original, y_original);
+						
+				j = j + 4; 
+				if (j > 255) {
+					j=1; 
+					//context.clearRect(0, 0, 600, 600);
+				}
+				x_prev = x_original;
+				y_prev = y_original;
+			}
+		})
+
+		function mouse_position() {
+			var mousePos;
+			var old_pos;
+			var x = 0; 
+			var y = 0; 
+			window.onmousemove = handleMouseMove;
+			setInterval(getMousePosition, 100); // setInterval repeats every X ms
+
+			function handleMouseMove(event) {
+				event = event || window.event; // IE-ism
+				mousePos = {
+					x: event.clientX-200,
+					y: event.clientY-200
+				};
+				
+			}
+
+			function getMousePosition() {
+				var pos = mousePos;
+				if (!pos) {
+					// We haven't seen any movement yet
+						context.beginPath();
+						context.moveTo(x, y)
+
+				}
+				else {
+					if (pos == old_pos) {
+						// No change
+					} else if (pos.x > 300 && pos.x < 540  && pos.y < 160 && pos.y > 40) {
+								x_num = pos.x;
+								y_num = pos.y;
+								y = y_num;
+								x = x_num;
+								console.log('xy: ', x, y);
+								width = Math.abs(x-300); 
+
+								y = y+160;
+								x = x+160; 
+								
+								line_x = x-width;
+								
+								if (x < 0) {
+									console.log(x);
+									line_x = line_x + Math.abs(width) + 10; 
+									width = width -9;	
+									}
+									y = y + 100;
+								
+
+								$('.circle').css({ top: y+'px', left: x+'px'});										
+								$('.line').css({ top: y+'px', left: line_x+'px', width: width+'px' });
+
+								// modify the values for screen numbers
+								x = Math.round(((x / 10) - 57.5) * 10) / 10;
+								y = Math.round(((y / 10) - 57.5) * 10) / 10;
+								$('#mouse_x_value').text(x);
+								$('.circle').text(' x: '+ x);
+		
+								if (width > 100){
+									$('.circle').css({borderColor: 'red'});
+		
+								} else {
+									$('.circle').css({borderColor: '#22ff00'});
+								}
+								socket.emit('mouse', { x_y : pos })
+					} else {
+
+					}	
+					old_pos = pos		
+				}
+			}
+		}
+		</script>
+		<style>
+		body {
+			background: #d2d4dd;
+			background-image: linear-gradient(90deg, transparent 30%, rgba(0,0,0,.02) 45%, rgba(0,0,0,.02) 55%, transparent 70%);
+			background-size: 8px 8px;
+			font: 100%/1.5 sans-serif;
+			text-shadow: 0 1px 1px white;
+			}	
+
+		a {
+			color: #0088cc;
+			text-decoration: none;
+		}
+
+		li {
+			list-style: none;
+		}
+		
+		.nav {
+			position:absolute; 
+			top: 0px;
+			left: 0px;
+			background-color: white; 
+			width: 280px;
+			height: 100%;  
+		}
+
+		.nav-list {
+			display: block;
+			padding-right: 15px;
+			padding-left: 15px;
+			margin-bottom: 0;
+			margin-left: 0;
+			padding: 0;
+			margin: 0 0 10px 25px;
+		}
+		
+		.nav-header {
+			display: block;
+			padding: 3px 0px;
+			font-size: 14px;
+			font-weight: bold;
+			line-height: 20px;
+			color: #999999;
+			text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
+			text-transform: uppercase;
+		}
+
+		.nav-list > li > a {
+			padding: 3px 15px;
+		}
+
+		.nav-list > li > a, .nav-list .nav-header {
+		margin-right: -15px;
+		margin-left: -15px;
+		text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
+		}
+
+		.nav > li > a {
+			display: block;
+		}
+	
+		.controller {
+ 			background-color:white;
+			position:absolute;
+			left:282px; 
+		  	width:600px;
+			top: 0px;
+			height:260px; 
+		}
+
+ 		.processing {
+			 background: rgba( 255, 255, 255, .8 ) 
+                url('http://sampsonresume.com/labs/pIkfp.gif') 
+                50% 50% 
+                no-repeat;
+		}
+
+		.usb {
+ 			background-color:white;
+			position:absolute;
+			left:282px; 
+		  	width:600px;
+			top: 450px;
+			height:80px; 
+		}
+		.modify {
+ 			background-color:white;
+			position:absolute;
+			left:282px; 
+		  	width:600px;
+			top: 520px;
+			height:564px; 
+		}
+
+		.play_area {
+		  position:absolute;
+		  left:282px;
+		  top:240px; 	 
+		  width:594px;
+		  height:200px;
+		  background-color:#b0e0e6;
+		  border: dotted;
+		}
+
+		.center_line{
+		  position:absolute; 
+		  top:32px; 
+		  left:300px; 
+		  width:3px;
+		  height:168px;
+		  background-color:black;
+		}
+
+		.info_area {
+		  position:relative;
+		  left:310px;
+		  top: 10px;  
+		  width:480px;
+		  height:40px;
+		  background-color:#ccc;
+		  font-size: 1.2em; 
+		  font-color: white;
+		  padding-left: 100px 
+		}
+		.title_mod {
+		  position:absolute;
+		  left:1200px;
+		  top:700px; 
+		  transform: rotate(20deg); 
+		  -ms-transform: rotate(20deg); /* IE 9 */
+		  -webkit-transform: rotate(20deg); /* Safari and Chrome */
+		}
+	.title_create {
+		  position:absolute;
+		  left:1200px;
+		  top:100px; 
+		  transform: rotate(20deg); 
+		  -ms-transform: rotate(20deg); /* IE 9 */
+		  -webkit-transform: rotate(20deg); /* Safari and Chrome */
+		}
+				
+	.circle{	
+		  position:absolute; 
+		  top: 290px;
+		  left: 400px;
+		  opaciy: 0.9;
+		  margin: auto;
+		  padding: 0;
+		  border-style: solid;
+		  border-color: #22ff00; 
+		  width: 16px;
+		  height: 16px;
+		  border-radius: 8px;
+		  background-color: black;
+		}
+		.line {
+		  position: absolute;
+		  top: 290px;
+		  left: 400px;
+		  margin: auto;
+		  padding: 0;
+		  width: 20px;
+		  height: 4px;
+		  background-color: black;
+		  transform-origin: 0px 0px;
+		  box-shadow: 20px -2px 34px green;
+		  z-index: 1000; 
+		  }
+
+		.canvas {
+		  position:absolute; 
+		  left:0px;
+		  top:80px;
+		    
+		}
+	.help_create {
+		  background-color:white;
+		  position:absolute; 
+		  left:885px;
+		  top:0px;
+ 		  width: 280px;
+		  height: 640px;    
+		}
+	.help_modify {
+		  background-color:white;
+		  position:absolute; 
+		  left:885px;
+		  top:540px;
+ 		  width: 280px;
+		  height: 544px;   
+		}
+	
+	.help_usb {
+		  background-color:white;
+		  position:absolute; 
+		  left:885px;
+		  top:440px;
+ 		  width: 280px;
+		  height: 340px;   
+		}
+	.help_mouse {
+		  background-color:white;
+		  position:absolute; 
+		  left:885px;
+		  top:260px;
+ 		  width: 280px;
+		  height: 340px;   
+		}
+
+	#file_dropdown {
+		width:200px; 	
+	}
+		</style>
+	<head>
+	<body>
+		<content>  	
+	 	<div class="nav">
+			<div class="settings">	
+				<ul class="nav_list">
+					<li class="nav-header"> Create Model </li>
+					<li class="nav-header"> / Input : <span id="input_val"> Random </span> </li>		
+					<li> 
+						<form> 						
+						<select name="input_create_dropdown" id="input" class="range">
+								<option value="random">Random</option>
+								<option value="csv">Csv</option>
+								<option value="potentiometer">Potentiometer</option>
+								<option value="mouse">Mouse</option>
+								<option value="none">None</option>
+						</select>
+	
+						</form>					
+					</li>
+					<li class="nav-header"> / pattern : <span id="pattern_val"> Plain </span> </li>		
+					<li> 
+						<form> 						
+						<select name="input_create_dropdown" id="pattern" class="range">
+								<option value="plain">Plain</option>
+								<option value="spikes">Spikes</option>
+						</select>
+	
+						</form>					
+					</li>				
+					<li class="nav-header"> / Settings </li>						
+					<li>
+						Line width: <span id="line_width_val"> 0.3 </span>	<br />	
+						<input type="range" min="0" max="30" step="1" value="3" class="range" id="line_width"/> 
+					
+					</li>
+					<li> 
+						 Segments: <span id="segment_val"> 10 </span> 	<br />	
+							<input type="range" min="0" max="30" step="1" value="10" class="range" id="segment" /> 
+					 </li>
+					<li>
+						Height: <span id="height_val"> 19 </span>	<br />	
+						<input type="range" min="0" max="40" step="1" value="19" class="range" id="height"/> 
+					
+					</li>
+					<li>
+						Radius: <span id="radius_val"> 30 </span>	<br />	
+						<input type="range" min="0" max="50" step="1" value="19" class="range" id="radius"/> 
+					
+					</li>
+					<li>
+						<li class="nav-header"> / filename: <span id="filename_val">web_model</span> </li>	
+						<input type="text" value="web_model" class="range"  id="filename"/> 
+					</li>
+					<br /> <br />					
+					<li> 
+						<a> 
+							<input type="submit" value="Create Model" size="20" id="create_id">
+						</a>
+					</li>
+				
+				</ul>
+	 		</div>
+			<hr />
+			<div class="import">
+				<ul class="nav_list">
+					<li class="nav-header"> Modify Model </li>	
+					<li class="nav-header"> / File : <span id="file_dropdown_val"> model.gcode </span> </li>	
+					<li> 
+					<form> 						 
+						<select name="file_dropdown" class="range" id="file_dropdown">
+								{{FILES}}
+						</select>
+						</form> 
+					</li>
+					<li class="nav-header"> / Input : <span id="mod_input_val"> Random </span> </li>							
+					<li> 
+						<form> 						
+						<select name="inputdropdown" class="range" id="mod_input">
+								<option value="random">Random</option>
+								<option value="csv">Csv</option>
+								<option value="potentiometer">Potentiometer</option>
+								<option value="mouse">Mouse</option>
+								<option value="none">None</option>
+						</select>	
+						</form>					
+					</li>
+					<li> 
+						<a> 
+							<input type="submit" value="Modify" size="20" id="modify_id">
+						</a>
+					</li>
+					<br />
+				</ul>
+	 		</div>
+		<hr />
+		
+		</div>
+		<div class="controller"> 
+			<ul class="nav_list">
+				<li class="nav-header"> Process </li>
+				<li class="nav-header"> / Current process </li>	
+				<li class="process_indicator"> None <br /> <br /> </li>
+			</ul>
+			<hr /> 	
+			<ul class="nav_list">
+					<li class="nav-header"> Controllers </li>
+					<li class="nav-header"> / Mouse </li>	
+					<li class="nav-header">Current modification # <span id="mouse_x_value"> None</span></li>
+			</ul>
+		</div>
+		<div class="play_area">
+			Mouse area
+			<hr />
+			<div class="center_line"></div>
+		</div>
+		<div class="circle">--->Mouse_your_mouse_here...</div>
+		<div class="line"></div>
+		<div class="usb"> 
+			<ul class="nav_list">
+				<li class="nav-header"> / Usb : <span id="usb_value"> Not connected </span></li>
+			</ul>
+	<hr />	 	
+		</div>
+
+		<div class="modify"> 
+			<ul class="nav_list">
+				<li class="nav-header"> Modification <span id="mod_value"> </span></li>
+				<li class="nav-header"> / Print vis area <span id="mod_value"> </span></li>
+				
+			</ul>
+		<hr />
+			<canvas class="canvas" id="myCanvas" width="560" height=560"></canvas>
+		</div>
+		<div class="help_create">	
+				<ul class="nav_list">
+					<li class="nav-header"> Help </li>
+					<li class="nav-header"> / Create a model  </li>
+					
+					<li> 
+						Choose an input, a pattern and modify the settings. Then hit Create.  
+					</li>
+				</ul>
+	 		</div>
+		<div class="help_mouse">	
+				<ul class="nav_list">
+					<li class="nav-header"> / mouse  </li>	
+					<li> 
+						When using mouse as input for altering the path.
+					</li>
+				</ul>
+	 		</div>
+		<div class="help_usb">	
+				<ul class="nav_list">
+					<li class="nav-header"> / usb  </li>	
+					<li> 
+						When using potentiometer as input 
+					</li>
+				</ul>
+	 		</div>
+		<div class="help_modify">	
+				<ul class="nav_list">
+					<li class="nav-header"> / Modify a model  </li>
+					<li> 
+						Choose a file to modify and a modification pattern. Then hit Modify.  
+					</li>
+				</ul>
+
+	 		</div>
+	
+		<h1 class="title_create"> <-- Create Model </h1>
+
+		<h1 class="title_mod"> <-- Modify Model </h1>
+
+		</content>
+	
+
+		
+		<script>
+
+	  	  mouse_position(); 
+		  var canvas = document.getElementById('myCanvas');
+		  var context = canvas.getContext('2d');
+		  context.beginPath();
+		  context.lineWidth=1;
+		  context.moveTo(10, 10);
+		  context.lineTo(590, 490);
+		  context.strokeStyle = "#ff0000";
+		  context.stroke();
+
+		$('.range').change(function () { 				
+			var val = $(this).val();
+			var sel = $(this).attr('id'); 
+			if (sel == "line_width") 
+				val = val / 10; 		
+			$('#'+sel+'_val').text(val); 
+		});
+
+		
+		$('#create_id').click(function () {
+        	$('.process_indicator').addClass("processing").html('Writing the model file <br><br>'); 
+		 	line_width = $('#line_width').val(); 
+  			segment = $('#segment').val(); 
+			input = $('#input_val').text();
+			height = $('#height_val').text();
+			filename = $('#filename_val').text();
+			radius = $('#radius_val').text();
+			socket.emit('run_settings', { line_width : line_width,  segment : segment, height: height, input : input, filename : filename, radius : radius })
+		});
+
+		$('#modify_id').click(function () {
+        	$('.process_indicator').addClass("processing").html('Modifying the model file <br><br>'); 
+			input = $('#mod_input_val').text();
+			filename = $('#file_dropdown_val').text();
+			filename = filename.split('.');
+			filename = filename[0]; 
+			socket.emit('run_mod_settings', { input : input, filename : filename })
+		});
+
+
+		</script>
+	  </body>
+	</html>
+	</body>
+

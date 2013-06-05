@@ -1,6 +1,5 @@
 var filesystem = require('fs');
 
-
 // a random number 
 function get_random() {
     var r = Math.random();
@@ -24,7 +23,6 @@ function make_near_number(old_limit, how_near) {
     return new_limit
 }
 
-
 function line_distance( p1x, p2x, p1y, p2y ) {
 	var xs = 0;
 	var ys = 0;
@@ -41,5 +39,3 @@ function line_distance( p1x, p2x, p1y, p2y ) {
 module.exports.get_random_with_limit = get_random_with_limit;
 module.exports.near = make_near_number;
 module.exports.line_distance = line_distance;
-
-

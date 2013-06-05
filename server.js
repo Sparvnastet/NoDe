@@ -1,8 +1,171 @@
-console.log('Staring timeout for process'); 
+// initiate server libs and variables
+var express = require("express")
+  , line_counter = -1 
+  , sum = 0
+  , file_counter = 0
+  , json = ''
+  , json_start = "{"
+  , json_end = "}" 
+  , line_number= 40
+  , line_collection = ''
+  , line_array = ''
+  , host = '127.0.0.1'
+  , port = '1337'
+  , app = express()
+  , modify = false
+  , line_number = 0; 
 
-// require npm packages
+// initiate  filesystem libs
 var filesystem = require('fs');
-var lazy = require("lazy");
+var lazy = require("lazy"); 
+
+// ---- server logic ----- 
+
+app.listen(port, host); // "host": "127.0.0.1", "port": 1338 in config
+
+var http = require('http')
+  , server = http.createServer(app)
+  , io = require('socket.io').listen(server);
+
+server.listen(1339); // using another port then for the app that is already in use, there migth be a better way to do this 
+console.log('open http://127.0.0.1:1339/')
+
+app.configure(function(){
+	app.use('/static', express.static(__dirname + '/static'));
+});
+
+
+function get_line_array(filename, callback) {
+	console.log(filename); 
+	new lazy(filesystem.createReadStream('test/' + filename))
+	.lines
+	.forEach(function(line){ 
+		if(line) {
+			if (line != '0' || line != undefined || line != ''){
+				line_collection = line_collection + line + ',';  
+			}
+		}
+		callback(line_collection)
+	});
+}
+
+
+function get_file_from_dir(callback) {
+	var dropdown_string = ''; 
+	filesystem.readdir('test', function(err, files) {
+		for (var s=0; s < files.length; s++) {
+			dropdown_string = dropdown_string + '<option value="'+files[s]+'">'+files[s]+'</option>';	
+		}			
+		callback(dropdown_string); 
+	});
+}
+
+app.get("/", function(request, response){
+	var files = get_file_from_dir(function(files) {
+    	file_list = files;  
+	});
+	var content = filesystem.readFileSync("index.html");
+	setTimeout(function(){
+		content = content.toString("utf8").replace("{{FILES}}", file_list);
+		response.setHeader("Content-Type", "text/html");
+		response.send(content);			
+	}, 100);
+});
+
+function set_line_by_file(filename) {
+get_line_array(filename+'.gcode', function(list) {
+		var line_list = list;
+		list_line = line_list.split(','); 
+		// console.log(list_line);  
+	});
+}
+
+io.sockets.on('connection', function (socket) {
+  var xandy = []; 
+  socket.emit('position', { position: 'start' });
+
+  socket.on('mouse', function (data) {
+	// add mouse postion to file
+	add_data(data); 
+  });
+
+  socket.on('run_settings', function (data) {h
+    segments = data.segment; 
+	height = data.height;
+	input = data.input;	
+	filename = data.filename+'.gcode';
+	radius = data.radius;
+	console.log('segments:' + segments + ' total_height: ' + height + ' input. ' + input + ' filename: ' + filename + ' radius: ' + radius); 
+	init_data();
+	// add a callback here instead. 
+	setTimeout(function(){
+  		socket.emit('process', { process: 'ok' });
+	}, 2000);
+	 
+  });
+
+ 
+
+  socket.on('run_mod_settings', function (data) {	
+	input = data.input;	
+	filename_old = data.filename; 
+	filename_old = filename_old.trim(); 
+	filename = filename_old + '_mod.gcode';  
+	console.log(' input. ' + input + ' filename: ' + filename); 
+	// add a callback here instead. 
+	init_data();
+	set_line_by_file(filename_old);
+	setTimeout(function(){
+  		socket.emit('process', { process: 'ok' });
+		if (list_line != '') {	
+		for(var h=0; line_number < list_line.length; h++) {	
+			get_line( 
+				function (line) {
+					socket.emit('mouse_client', { x_y : line }); 
+				})
+			}
+		}
+		socket.emit('process', { process: 'ok' });
+	}, 3000);	
+ 
+  });
+
+});
+
+function get_line(callback) { 
+	if(line_number < list_line.length) {
+		var line = list_line[line_number]; 
+		line_number++;
+		callback(line);  
+	} else {
+		return false; 
+	}	
+}
+			
+
+function add_data(data) {
+    line_counter++; 
+    value = parseInt(data.x_y.x); 
+	json = json_start;
+	json = json + '"observ"'+':' +'"'+value+'"';
+	json = json + json_end; 
+	
+	filesystem.writeFile('test/mouse.json',json, function (err) {
+		console.log('tabula rasa'); 
+	});
+}    
+
+function clean_file() {
+    filesystem.writeFile('test/mouse.json','', function (err) {
+		console.log('tabula rasa'); 
+	});
+}
+
+// ------------- server logic end
+
+// ------------- circle logic start
+
+console.log('Staring timeout for process'); 
 
 // import common functions 
 var modules = require('./modules.js');
@@ -111,6 +274,7 @@ console.log('center x, y: '+ centerX+' , '+ centerY +
 		first = 0; 
 		key_data = data_from_file.toString().split(',');
 		console.log('Writing model'); 
+		console.log(segments, height, input, filename); 
 		make_circle(centerX, centerY, radius_f, segments, height); 
 	}, 2000);
 }
@@ -180,7 +344,6 @@ function make_circle(centerX, centerY, radius_f, segments, height, data){
 				line = line + '\n'; 
 			}
 
-
 		// add the line to the circle		
 		circle = circle + line;	
 		line = ''; 
@@ -189,8 +352,21 @@ function make_circle(centerX, centerY, radius_f, segments, height, data){
 	// write the new circle to file	
 	write_new_circle_data(circle);
 	// reset the circle value
-	circle = '';		
-	} 
+	circle = '';
+		
+	} else {
+		line_counter = -1, 
+		sum = 0;
+		file_counter = 0
+		line_number= 40
+  		line_collection = '';
+		x = config.x;  
+		y = config.y; 
+		z = config.z;
+		key = 0;
+		list_key = 0;
+		// console.log('file: ' + filename + ' written to'); 
+		}
 }
 
 // write a copy of a circle when we only change the z-axes
@@ -357,5 +533,3 @@ function get_data_by_key() {
     return data_from_key;
 }
 
-// init process
-init_data(); 
